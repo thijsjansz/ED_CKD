@@ -1,0 +1,19 @@
+XaXgw	C/O erectile dysfunction
+XaMBP	Treatment of erectile dysfunction NEC
+XaMsd	Operations on penis for erectile dysfunction NEC
+XaXgy	Erectile dysfunction unresponsive to phosphodiesterase-5 inhibitor
+XaL47	Referral to erectile dysfunction clinic
+XaXiT	Referral to erectile dysfunction clinic declined
+E2273	Impotence
+E2273	Erectile dysfunction
+XE1Zs	Failure of genital response
+E2273	Impotence
+E2273	Erectile dysfunction
+Eu522	[X]Male erectile disorder
+X400I	Psychogenic impotence
+XE1Zs	Failure of genital response
+Xaa8r	Erectile dysfunction due to diabetes mellitus
+XaIO3	Advice about impotence
+7A6G0	Revascularisation for impotence
+7A6G5	Ligation of penile veins for impotence
+K27y1	Impotence of organic origin

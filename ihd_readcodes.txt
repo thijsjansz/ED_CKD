@@ -1,0 +1,197 @@
+8H2V.#	Admit ischaemic heart disease emergency
+G3...#	Ischaemic heart disease
+G3...#	Ischaemic heart disease
+G3...#	Ischaemic heart disease
+G3...#	Ischaemic heart disease
+G31..#	Other acute and subacute ischaemic heart disease
+G31..#	Other acute and subacute ischaemic heart disease
+G31y.#	Other acute and subacute ischaemic heart disease
+G31y2#	Subendocardial ischaemia
+G31yz#	Other acute and subacute ischaemic heart disease NOS
+G34..#	Other chronic ischaemic heart disease
+G34..#	Other chronic ischaemic heart disease
+G340.#	Coronary atherosclerosis
+G340.#	Coronary atherosclerosis
+G340.#	Coronary atherosclerosis
+G344.#	Silent myocardial ischaemia
+G34y.#	Other specified chronic ischaemic heart disease
+G34y1#	Chronic myocardial ischaemia
+G34yz#	Other specified chronic ischaemic heart disease NOS
+G34z.#	Other chronic ischaemic heart disease NOS
+G34z0#	Asymptomatic coronary heart disease
+G3y..#	Other specified ischaemic heart disease
+G3z..#	Ischaemic heart disease NOS
+Gyu3.#	[X]Ischaemic heart diseases
+Gyu32#	[X]Other forms of acute ischaemic heart disease
+Gyu33#	[X]Other forms of chronic ischaemic heart disease
+G30y1#	Acute papillary muscle infarction
+G31y1#	Microinfarction of heart
+X200D#	Silent myocardial ischaemia
+Xa1dP#	Ischaemic myocardial dysfunction
+G31y0#	Acute coronary insufficiency
+G31y0#	Acute coronary insufficiency
+14A5.	H/O: angina pectoris
+662K.	Angina control
+662K0	Angina control - good
+662K1	Angina control - poor
+662K2	Angina control - improving
+662Kz	Angina control NOS
+G33..	Angina pectoris
+G33z.	Angina pectoris NOS
+G33z3	Angina on effort
+G33zz	Angina pectoris NOS
+Gyu30	[X]Other forms of angina pectoris
+662K3	Angina control - worsening
+G311.	Preinfarction syndrome
+G311.	Preinfarction syndrome
+G311.	Preinfarction syndrome
+G311.	Preinfarction syndrome
+G311.	Preinfarction syndrome
+G33z4	Ischaemic chest pain
+14AJ.	H/O: Angina in last year
+8B27.	Antianginal therapy
+G33z1	Stenocardia
+G33z2	Syncope anginosa
+G33z5	Post infarct angina
+G33z6	New onset angina
+G33z7	Stable angina
+G34y0	Chronic coronary insufficiency
+G3113	Refractory angina
+G3114	Worsening angina
+G3111	Unstable angina
+G3112	Angina at rest
+G311z	Preinfarction syndrome NOS
+G33z0	Status anginosus
+G3115	Acute coronary syndrome
+G331.	Prinzmetal's angina
+G331.	Prinzmetal's angina
+X2007	Angina at rest
+X2008	Stable angina
+X2009	Unstable angina
+X200A	New onset angina
+XE0Ui	Worsening angina
+Xa7nH	Exercise-induced angina
+XaBL2	H/O: Angina in last year
+XaBLr	Antianginal therapy
+XaEXt	Post infarct angina
+XaFsG	Refractory angina
+XaXnr	Frequency of angina
+14A3.	H/O: myocardial infarct <60
+14A4.	H/O: myocardial infarct >60
+G310.	Postmyocardial infarction syndrome
+G310.	Postmyocardial infarction syndrome
+G32..	Old myocardial infarction
+G32..	Old myocardial infarction
+G32..	Old myocardial infarction
+323..	ECG: myocardial infarction
+323Z.	ECG: myocardial infarct NOS
+G300.	Acute anterolateral infarction
+G301.	Other specified anterior myocardial infarction
+G3010	Acute anteroapical infarction
+G3011	Acute anteroseptal infarction
+G301z	Anterior myocardial infarction NOS
+G302.	Acute inferolateral infarction
+G303.	Acute inferoposterior infarction
+G304.	Posterior myocardial infarction NOS
+G305.	Lateral myocardial infarction NOS
+G306.	True posterior myocardial infarction
+G307.	Acute subendocardial infarction
+G308.	Inferior myocardial infarction NOS
+G30y.	Other acute myocardial infarction
+G30y0	Acute atrial infarction
+G30y2	Acute septal infarction
+G30yz	Other acute myocardial infarction NOS
+G30z.	Acute myocardial infarction NOS
+Gyu34	[X]Acute transmural myocardial infarction of unspecif site
+G35..	Subsequent myocardial infarction
+G350.	Subsequent myocardial infarction of anterior wall
+G351.	Subsequent myocardial infarction of inferior wall
+G353.	Subsequent myocardial infarction of other sites
+G36..	Certain current complication follow acute myocardial infarct
+G360.	Haemopericardium/current comp folow acut myocard infarct
+G361.	Atrial septal defect/curr comp folow acut myocardal infarct
+G363.	Ruptur cardiac wall w'out haemopericard/cur comp fol ac MI
+G364.	Ruptur chordae tendinae/curr comp fol acute myocard infarct
+G365.	Rupture papillary muscle/curr comp fol acute myocard infarct
+G366.	Thrombosis atrium,auric append&vent/curr comp foll acute MI
+14AH.	H/O: Myocardial infarction in last year
+G33z5	Post infarct angina
+G30X0	Acute ST segment elevation myocardial infarction
+G3071	Acute non-ST segment elevation myocardial infarction
+3233	ECG: antero-septal infarct.
+3234	ECG:posterior/inferior infarct
+3235	ECG: subendocardial infarct
+3236	ECG: lateral infarction
+889A.	Diab mellit insulin-glucose infus acute myocardial infarct
+G3070	Acute non-Q wave infarction
+G309.	Acute Q-wave infarct
+G30B.	Acute posterolateral myocardial infarction
+G30X.	Acute transmural myocardial infarction of unspecif site
+G38..	Postoperative myocardial infarction
+G380.	Postoperative transmural myocardial infarction anterior wall
+G381.	Postoperative transmural myocardial infarction inferior wall
+G384.	Postoperative subendocardial myocardial infarction
+G38z.	Postoperative myocardial infarction, unspecified
+G35X.	Subsequent myocardial infarction of unspecified site
+G362.	Ventric septal defect/curr comp fol acut myocardal infarctn
+G501.	Post infarction pericarditis
+3232	ECG: old myocardial infarction
+3233	ECG: anteroseptal infarction
+3234	ECG:posterior/inferior infarct
+3235	ECG: subendocardial infarct
+3236	ECG: lateral infarction
+Gyu31	[X]Other current complicatns following acute myocard infarct
+Gyu35	[X]Subsequent myocardial infarction of other sites
+Gyu36	[X]Subsequent myocardial infarction of unspecified site
+X200E	Myocardial infarction
+X200G	Acute Q wave infarction - anteroseptal
+X200H	Acute non-Q wave infarction - anteroseptal
+X200I	Acute Q wave infarction - anterolateral
+X200J	Acute non-Q wave infarction - anterolateral
+X200K	Acute inferior myocardial infarction
+X200L	Acute Q wave infarction - inferior
+X200M	Acute non-Q wave infarction - inferior
+X200N	Acute Q wave infarction - inferolateral
+X200O	Acute non-Q wave infarction - inferolateral
+X200P	Acute lateral myocardial infarction
+X200Q	Acute Q wave infarction - lateral
+X200R	Acute non-Q wave infarction - lateral
+X200S	Acute widespread myocardial infarction
+X200T	Acute Q wave infarction - widespread
+X200U	Acute non-Q wave infarction - widespread
+X200V	Acute posterior myocardial infarction
+X200W	Old anterior myocardial infarction
+X200X	Old inferior myocardial infarction
+X200Y	Old lateral myocardial infarction
+X200Z	Old posterior myocardial infarction
+X200a	Silent myocardial infarction
+X200d	Post-infarction ventricular septal defect
+X200e	Cardiac rupture after acute myocardial infarction
+X200x	Post-infarction mitral papillary muscle rupture
+X201u	Post-infarction pericarditis
+XE0Uh	Acute myocardial infarction
+XE0WA	Myocardial infarction (& [acute]) or coronary thrombosis
+XE2aA	Old myocardial infarction
+Xa0YL	Acute anterior myocardial infarction
+XaAC3	Acute Q wave myocardial infarction
+XaAzi	Acute non-Q wave infarction
+XaBL1	H/O: Myocardial infarction in last year
+XaD2b	Postoperative myocardial infarction
+XaD2d	Postoperative transmural myocardial infarction anterior wall
+XaD2e	Postoperative transmural myocardial infarction inferior wall
+XaD2f	Postoperative transmural myocardial infarction other sites
+XaD2g	Postoperative transmural myocardial infarction unspec site
+XaD2h	Postoperative subendocardial myocardial infarction
+XaD2i	Postoperative myocardial infarction, unspecified
+XaEXt	Post infarct angina
+XaEgZ	Non-Q wave myocardial infarction
+XaFx7	Diab mellit insulin-glucose infus acute myocardial infarct
+XaIf1	First myocardial infarction
+XaIwM	Acute ST segment elevation myocardial infarction
+XaIwY	Acute non-ST segment elevation myocardial infarction
+XaJX0	Acute posterolateral myocardial infarction
+XaQk7	History of myocardial infarction
+XaRFL	Exception reporting: myocardial infarction quality indicator
+XaRFO	Exc myocard infarction quality indicators: informed dissent
+XaRFP	Exc myocar infarction quality indicators: patient unsuitable
+Y1eef	Mixed myocardial ischaemia and infarction
