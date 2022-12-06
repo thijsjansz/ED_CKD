@@ -12,6 +12,8 @@
 # 3.  PREPARING DATA FOR ANALYSIS
 # 4.  TABLES
 # 5.  SURVIVAL ANALYSES
+# 6.  IMPUTATION OF MISSING DATA (BMI, TDI, SMOKING STATUS)
+# 7.  PROPENSITY SCORE MATCHING
 #################################
 
 #################################
@@ -21,7 +23,9 @@ library(tidyverse)
 library(haven)
 library(survival)
 library(survminer)
-
+library(Hmisc)
+library(MatchIt)
+library(tableone)
 ed_data <- as.data.frame(read_dta("~/pilot/R_ed_ckd_data.dta"))
 
 #select patients with available primary care data 
@@ -836,6 +840,7 @@ ed_data$age_censoring <- ifelse(
            ed_data$DOB, units = "days")/365.25), NA
 )
 ed_data$age_event <- pmin(ed_data$age_dead, ed_data$comb_ckd_age, ed_data$age_censoring, na.rm = T)
+#for the cause-specific models (with death as competing risk), we will create a new variable called age_event2 so that follow up only ends when a participant dies or at end of follow up (not when they get CKD).
 ed_data$age_event2 <- pmin(ed_data$age_dead, ed_data$age_censoring, na.rm = T)
 #furthermore, I am making a variable called age_start, as it would not make sense to start looking at people from before the age of 35.
 ed_data$age_start <- 35
@@ -918,8 +923,6 @@ ed_data[ed_data$comb_ed_dx_pre == F,]$comb_cvd_age %>% summary()
 ed_data[ed_data$comb_ed_dx_pre == T,]$comb_cvd_age %>% sd(na.rm = T)
 ed_data[ed_data$comb_ed_dx_pre == F,]$comb_cvd_age %>% sd(na.rm = T)
 (ed_data[ed_data$comb_ed_dx_pre == T,]$comb_cvd_age < ed_data[ed_data$comb_ed_dx_pre == T,]$comb_ed_age) %>% summary()
-
-
 ed_data[ed_data$comb_ed_dx_pre == T,]$comb_ckd_dx %>% summary()
 ed_data[ed_data$comb_ed_dx_pre == F,]$comb_ckd_dx %>% summary()
 ed_data[ed_data$comb_ed_dx_pre == T,]$comb_ckd_age %>% summary()
@@ -969,8 +972,6 @@ aggregate(ed_data$person_years_noned_death~ed_data$comb_ed_dx_pre, FUN=sum)
 #################################
 # 5.  SURVIVAL ANALYSES
 #################################
-#write.csv(ed_data, "~/pilot/ed_data.csv", row.names = F)
-#ed_data <- read.csv("~/pilot/ed_data.csv", header = T)
 #COX REGRESSION
 td_dat <-
   tmerge(
@@ -1010,8 +1011,9 @@ summary(fit.coxph)
 
 
 #As the "normal" cox model (with only ckd as event) has numerically similar results, I will use that to show a survival curve as well.
-dummy <- expand.grid(ed=c(1, 0), diabetes = c(1,0), hypertension = c(1,0), birth_cohort="1945-1955", BMI = 27.92, 
-                     smoking_status = "never", ethnicity = "white", TDI = -2.1368, ihd = 0.1644557, stroke = 0.06293191)
+dummy <- expand.grid(ed=c(1, 0), diabetes = c(1,0), hypertension = c(1,0), birth_cohort="1945-1955", BMI = mean(ed_data$BMI, na.rm = T), 
+                     smoking_status = "never", ethnicity = "white", TDI = median(ed_data$TDI, na.rm = T), 
+                     ihd = mean(ed_data$comb_ihd_dx), stroke = mean(ed_data$comb_cvd_dx))
 csurv2 <- survfit(fit.coxph, newdata=dummy)
 
 #below are the resulting Aalen-Johansen estimates.
@@ -1028,8 +1030,9 @@ legend(38,0.85,
 
 
 #this plot is the same data but then only ED vs non ED
-dummy <- expand.grid(ed=c(1, 0), diabetes = 1, hypertension = 1, birth_cohort="1945-1955", BMI = 27.92, 
-                     smoking_status = "never", ethnicity = "white", TDI = -2.1368, ihd = 0.1644557, stroke = 0.06293191)
+dummy <- expand.grid(ed=c(1, 0), diabetes = 1, hypertension = 1, birth_cohort="1945-1955", BMI = mean(ed_data$BMI, na.rm = T), 
+                     smoking_status = "never", ethnicity = "white", TDI = median(ed_data$TDI, na.rm = T), 
+                     ihd = mean(ed_data$comb_ihd_dx), stroke = mean(ed_data$comb_cvd_dx))
 csurv2 <- survfit(fit.coxph, newdata=dummy)
 
 plot(csurv2, xlim = c(40,80), xscale=1, ylim = c(0.5,1),
@@ -1041,22 +1044,26 @@ legend(38,0.85,
        col=2:1, lty=c(2,1), bty='n', lwd=2)
 
 #calculating a number needed to treat.
-dummy3 <- expand.grid(ed = 0, diabetes = 0, hypertension = 0, birth_cohort = "1945-1955", BMI = 27.92, smoking_status = "never",
-                      ethnicity = "white", TDI = -2.1368, ihd = 0, stroke = 0)
+dummy3 <- expand.grid(ed = 0, diabetes = 0, hypertension = 0, birth_cohort = "1945-1955", BMI = mean(ed_data$BMI, na.rm = T), smoking_status = "never",
+                      ethnicity = "white", TDI = median(ed_data$TDI, na.rm = T), ihd = 0, stroke = 0)
 surv_control <- survfit(fit.coxph, newdata = dummy3)
-surv_control[[2]][9677] #age is 65
-prob <- surv_control[[6]][9677] #CKD free survival probability in someone without ED, DM, HTN, IHD, stroke, never smoker etc.
+m <- 1
+while(surv_control[[2]][m] < 65) {
+  m <- m + 1
+}
+surv_control[[2]][m] #age is 65
+prob <- surv_control[[6]][m] #CKD free survival probability in a 65M without ED, DM, HTN, IHD, stroke, never smoker etc.
 
 hr <- fit.coxph$coefficients[1] %>% exp()
-LB.CI         <- (fit.coxph$coefficients[1] - (sqrt(fit.coxph$var[1])*1.96)) %>% exp()
-UB.CI         <- (fit.coxph$coefficients[1] + (sqrt(fit.coxph$var[1])*1.96)) %>% exp()
+UB.CI         <- (fit.coxph$coefficients[1] - (sqrt(fit.coxph$var[1])*1.96)) %>% exp()
+LB.CI         <- (fit.coxph$coefficients[1] + (sqrt(fit.coxph$var[1])*1.96)) %>% exp()
 
 #Altman DG, Andersen PK. Calculating the number needed to treat for trials where the outcome is time to an event. BMJ. 1999 Dec 4;319(7223):1492-5. doi: 10.1136/bmj.319.7223.1492. PMID: 10582940; PMCID: PMC1117211.
-NNT <- 1/(prob^hr - prob)
-NNT_lb <- 1/(prob^LB.CI - prob)
-NNT_ub <- 1/(prob^UB.CI - prob)
+NNT     <-    1/(prob - prob^hr)
+NNT_ub  <-    1/(prob - prob^UB.CI)
+NNT_lb  <-    1/(prob - prob^LB.CI)
 
-paste0("NNT: ", round(NNT), ", lower bound ", round(NNT_lb), ", upper bound ", round(NNT_ub))
+paste0("NNT: ", round(NNT), " (95% CI ", round(NNT_lb), " - ", round(NNT_ub), ")")
 
 # COMPETING RISK ANALYSIS WITH DEATH AS COMPETING RISK
 td_dat2 <-
@@ -1104,3 +1111,295 @@ csurv <- survfit(cr.fit, newdata=dummy)
 #below are the resulting Aalen-Johansen estimates.
 #plot(csurv[,'ckd'], xlim = c(40,80), xscale=1, xlab="Age", ylab="CKD", col=1:2, lty=c(1,1,2,2,3,3,4,4), lwd=2)
 #legend(38,0.22, outer(c(outer(c("ED", "No ED"), c("DM", "no DM"),paste, sep=", ")), c("HTN", "no HTN"), paste, sep = ", "), cex = 0.7, col=1:2, lty=c(1,1,2,2,3,3,4,4), bty='n', lwd=2)
+
+#################################
+# 6.  IMPUTATION OF MISSING DATA
+#################################
+
+
+n.imp <- 10
+set.seed(007)
+temp <- ed_data %>% select(n_eid, age_event, age_start, age_event2, birth_cohort, ethnicity, age_censoring, age_dead, dead, comb_ed_dx_pre, 
+                           comb_ed_age, comb_ckd_dx, comb_ckd_age, comb_diabetes_dx,
+                           comb_diabetes_age, comb_hypertension_dx, comb_hypertension_age,
+                           comb_ihd_dx, comb_ihd_age, comb_cvd_dx, comb_cvd_age,
+                           smoking_status, BMI, TDI)
+imp <- aregImpute(~n_eid + age_event + age_start + age_event2 + age_dead + birth_cohort + age_censoring + ethnicity + dead + comb_ed_dx_pre + 
+                    comb_ed_age + comb_ckd_dx + comb_ckd_age + comb_diabetes_dx +
+                    comb_diabetes_age + comb_hypertension_dx + comb_hypertension_age +
+                    comb_ihd_dx + comb_ihd_age + comb_cvd_dx + comb_cvd_age +
+                    smoking_status + BMI + TDI,
+                  data = temp,
+                  nk = 0,
+                  type = "pmm",
+                  n.impute = n.imp)
+completed <- head(temp, 1)
+completed$.imp <- 0
+for (i in 1:n.imp) { 
+  imp.i <- temp 
+  imputed <- as.data.frame(impute.transcan(imp, 
+                                           imputation=i, 
+                                           data=temp, list.out=TRUE, 
+                                           pr=FALSE, check=FALSE))
+  imputed <- imputed[c("BMI", "TDI", "smoking_status")] # only keep BMI, TDI, smoking status
+  imp.i[names(imputed)] <- imputed # replace these in the imputed datasets
+  imp.i$.imp <- i 
+  completed <- rbind(completed, imp.i) 
+  remove(imp.i)
+  remove(imputed)
+}
+completed <- completed[completed$.imp %in% c(1:n.imp),]
+
+COEFS.unadjusted        <- SE.unadjusted   <- rep(NA,n.imp)
+COEFS.adjusted          <- SE.adjusted   <- rep(NA,n.imp)
+
+completed$n_eid.imp <- paste0(completed$n_eid, ".", completed$.imp)
+
+td_dat <- 
+  tmerge(
+    data1 = completed %>% select(n_eid, n_eid.imp, .imp, comb_ed_dx_pre, comb_ckd_dx, dead, birth_cohort, smoking_status, BMI, TDI, ethnicity),
+    data2 = completed %>% select(n_eid, n_eid.imp, .imp, age_censoring, age_event, age_dead, dead, comb_ed_dx_pre, 
+                                 comb_ed_age, comb_ckd_dx, comb_ckd_age, comb_diabetes_dx,
+                                 comb_diabetes_age, comb_hypertension_dx, comb_hypertension_age,
+                                 comb_ihd_dx, comb_ihd_age, comb_cvd_dx, comb_cvd_age,
+                                 smoking_status, BMI, TDI, ethnicity, age_start, birth_cohort),
+    id = n_eid.imp,
+    ed = tdc(comb_ed_age),
+    ckd = event(comb_ckd_age, comb_ckd_dx),
+    death = event(age_dead, dead),
+    diabetes = tdc(comb_diabetes_age),
+    hypertension = tdc(comb_hypertension_age),
+    ihd = tdc(comb_ihd_age),
+    stroke = tdc(comb_cvd_age),
+    tstart = age_start,
+    tstop = age_event
+    
+  ) 
+
+
+for (i in 1:n.imp) {
+  #univariate:
+  m1 <- coxph(
+    Surv(time = tstart, time2 = tstop, event = ckd) ~ ed, 
+    data = td_dat[td_dat$.imp == i,]
+  ) 
+  COEFS.unadjusted[i] 	<- m1$coefficients[1]
+  SE.unadjusted[i] 	    <- sqrt(m1$var[1])
+  
+  #multivariate:
+  m2 <- coxph(
+    Surv(time = tstart, time2 = tstop, event = ckd) ~ ed + birth_cohort + 
+      BMI + smoking_status + ethnicity + TDI + 
+      diabetes + hypertension + ihd + stroke, 
+    data = td_dat[td_dat$.imp == i,]
+  ) 
+  COEFS.adjusted[i] 	<- m2$coefficients[1]
+  SE.adjusted[i] 	    <- sqrt(m2$var[1])
+}
+
+Pool.rubin.HR      <- function(COEFS,SE,n.imp){   
+  mean.coef     <- mean(COEFS)
+  W 	        	<- mean(SE^2)
+  B 		        <- var(COEFS)
+  T.var 	      <- W + (1+1/n.imp)*B
+  se.coef 	    <- sqrt(T.var)
+  rm            <- (1+1/n.imp)*B/W
+  df            <- (n.imp - 1)*(1+1/rm)^2
+  LB.CI         <- mean.coef - (se.coef*1.96)
+  UB.CI         <- mean.coef + (se.coef*1.96)
+  F             <- (-mean.coef)^2/T.var
+  P             <- pf(q=F, df1=1, df2=df, lower.tail = FALSE)
+  HR            <- exp(mean.coef)
+  HR.lower      <- exp(LB.CI)
+  HR.upper      <- exp(UB.CI)
+  output 	      <- c(HR, HR.lower, HR.upper, df, F, P)	
+  names(output) <- c('HR', 'lower bound', 'upper bound', 'df', 'F', 'P')
+  return(output)}
+
+# pooled HR:
+Pool.rubin.HR(COEFS.unadjusted, SE.unadjusted, n.imp)
+Pool.rubin.HR(COEFS.adjusted, SE.adjusted, n.imp)
+
+#As the "normal" cox model (with only ckd as event) has numerically similar results, 
+#I will use that to show a predicted survival curve of the "average" patient with and without ED, DM, or HTN.
+dummy <- expand.grid(ed=c(1, 0), diabetes = c(1,0), hypertension = c(1,0), birth_cohort="1945-1955", BMI = mean(ed_data$BMI, na.rm = T), 
+                     smoking_status = "never", ethnicity = "white", TDI = median(ed_data$TDI, na.rm = T), 
+                     ihd = mean(ed_data$comb_ihd_dx), stroke = mean(ed_data$comb_cvd_dx))
+csurv <- survfit(m2, newdata=dummy)
+
+#below are the resulting Aalen-Johansen estimates.
+plot(csurv, xlim = c(40,80), xscale=1, ylim = c(0.5,1),
+     xlab="Age", ylab="CKD-free survival", 
+     col=c(1,1,"firebrick1", "firebrick1", "dodgerblue", "dodgerblue", "chartreuse3", "chartreuse3"), lty=c(2:1), lwd=2)
+legend(38,0.85,
+       outer(c(outer(c("ED", "No ED"),
+                     c("DM", "no DM"),
+                     paste, sep=", ")),
+             c("HTN", "no HTN"),
+             paste, sep = ", "), cex = 0.7,
+       col=c(1,1,"firebrick1", "firebrick1", "dodgerblue", "dodgerblue", "chartreuse3", "chartreuse3"), lty=2:1, bty='n', lwd=2)
+
+
+#this plot is the same data but then only ED vs non ED
+dummy2 <- expand.grid(ed=c(1, 0), diabetes = mean(ed_data$comb_diabetes_dx), hypertension = mean(ed_data$comb_hypertension_dx), birth_cohort="1945-1955", BMI = mean(ed_data$BMI, na.rm = T), 
+                      smoking_status = "never", ethnicity = "white", TDI = median(ed_data$TDI, na.rm = T), 
+                      ihd = mean(ed_data$comb_ihd_dx), stroke = mean(ed_data$comb_cvd_dx))
+csurv2 <- survfit(m2, newdata=dummy2)
+
+plot(csurv2, xlim = c(40,80), xscale=1, ylim = c(0.75,1),
+     xlab="Age", ylab="CKD-free survival", 
+     col=2:1, lty=c(2,1), lwd=2)
+legend(38,0.9,
+       c("ED", "No ED"),
+       cex = 0.7,
+       col=2:1, lty=c(2,1), bty='n', lwd=2)
+
+#calculating a number needed to treat.
+dummy3 <- expand.grid(ed = 0, diabetes = 0, hypertension = 0, birth_cohort = "1945-1955", BMI = mean(ed_data$BMI, na.rm = T), smoking_status = "never",
+                      ethnicity = "white", TDI = median(ed_data$TDI, na.rm = T), ihd = 0, stroke = 0)
+surv_control <- survfit(m2, newdata = dummy3)
+m <- 1
+while(surv_control[[2]][m] < 65) {
+  m <- m + 1
+}
+surv_control[[2]][m] #age is 65
+prob <- surv_control[[6]][m] #CKD free survival probability in a 65M without ED, DM, HTN, IHD, stroke, never smoker etc.
+
+hr            <- m2$coefficients[1] %>% exp()
+UB.CI         <- (m2$coefficients[1] - (sqrt(m2$var[1])*1.96)) %>% exp()
+LB.CI         <- (m2$coefficients[1] + (sqrt(m2$var[1])*1.96)) %>% exp()
+
+#Altman DG, Andersen PK. Calculating the number needed to treat for trials where the outcome is time to an event. BMJ. 1999 Dec 4;319(7223):1492-5. doi: 10.1136/bmj.319.7223.1492. PMID: 10582940; PMCID: PMC1117211.
+NNT     <-    1/(prob - prob^hr)
+NNT_ub  <-    1/(prob - prob^UB.CI)
+NNT_lb  <-    1/(prob - prob^LB.CI)
+
+print(paste0("NNT: ", round(NNT), " (95% CI ", round(NNT_lb), " - ", round(NNT_ub), ")"))
+
+# COMPETING RISK ANALYSIS WITH DEATH AS COMPETING RISK
+td_dat2 <-
+  tmerge(
+    data1 = completed %>% select(n_eid, .imp, comb_ed_dx_pre, comb_ckd_dx, dead, birth_cohort, smoking_status, BMI, TDI, ethnicity),
+    data2 = completed %>% select(n_eid, age_censoring, age_event2, age_dead, dead, comb_ed_dx_pre, 
+                                 comb_ed_age, comb_ckd_dx, comb_ckd_age, comb_diabetes_dx,
+                                 comb_diabetes_age, comb_hypertension_dx, comb_hypertension_age,
+                                 comb_ihd_dx, comb_ihd_age, comb_cvd_dx, comb_cvd_age,
+                                 smoking_status, BMI, TDI, ethnicity, age_start, birth_cohort),
+    id = n_eid,
+    ed = tdc(comb_ed_age),
+    ckd = event(comb_ckd_age, comb_ckd_dx),
+    death = event(age_dead, dead),
+    diabetes = tdc(comb_diabetes_age),
+    hypertension = tdc(comb_hypertension_age),
+    ihd = tdc(comb_ihd_age),
+    stroke = tdc(comb_cvd_age),
+    tstart = age_start,
+    tstop = age_event2
+    
+  )
+
+# first - create event variable for multi-state model
+temp <- with(td_dat2, ifelse(death==1, 2, ckd))
+td_dat2$event <- factor(temp, 0:2, labels=c("censor", "ckd", "death"))
+remove(temp)
+
+#fit a cause-specific cox proportional hazards model:
+cr.fit <- coxph(Surv(tstart, tstop, event) ~ ed, data=td_dat2, id=n_eid)
+summary(cr.fit)
+#adjusted:
+cr.fit <- coxph(Surv(tstart, tstop, event) ~ ed + birth_cohort + 
+                  BMI + smoking_status + ethnicity + TDI + 
+                  diabetes + hypertension + ihd + stroke, data=td_dat2, id=n_eid)
+summary(cr.fit)
+
+#################################
+# 7.  PROPENSITY SCORE MATCHING
+#################################
+
+#create empty data frame
+matched <- data.frame(matrix(ncol = ncol(completed)))
+names(matched) <- names(completed)
+matched$.imp <- NA
+
+for (i in 1:n.imp) {
+  
+  baseline <- completed[completed$.imp == i,] %>% 
+    group_by(n_eid) %>% 
+    filter(age_start == min(age_start))
+  
+  match <- matchit(comb_ed_dx_pre ~ age_start + birth_cohort + 
+                     BMI + smoking_status + ethnicity + TDI + 
+                     comb_diabetes_dx + comb_hypertension_dx +
+                     comb_ihd_dx + comb_cvd_dx,
+                   data=baseline, 
+                   method="nearest", 
+                   distance="logit", 
+                   discard="both", 
+                   caliper=0.1, 
+                   ratio=2
+  )
+  
+  # extract matrix with matched n_eid
+  matrix.match <- cbind(data.frame(baseline[row.names(match$match.matrix),"n_eid"]), 
+                        data.frame(baseline[match$match.matrix,"n_eid"]))
+  matrix.match <- data.frame(matrix.match, row.names=NULL) 
+  
+  # filter out unmatched n_eid
+  matrix.match <- matrix.match[complete.cases(matrix.match),] 
+  
+  # select matched patients from imputed dataframe
+  temp <- completed[completed$.imp == i & 
+                      (completed$n_eid %in% matrix.match$n_eid | 
+                         completed$n_eid %in% matrix.match$n_eid.1),] 
+  # attach this to the matched cases
+  matched <- rbind(matched,temp) 
+  #remove(temp)     
+  #remove(match)
+  #remove(matrix.match)
+  print(paste0("Iteration ", i, " completed"))
+}
+# remove row with NA
+matched <- matched[!is.na(matched$n_eid),]
+
+# for table comparing ED with non ED (matched) (incl SMD)
+vars <- c("age_start", "birth_cohort", "smoking_status", "TDI", "BMI", "ethnicity", "comb_hypertension_dx", "comb_diabetes_dx", "comb_ihd_dx", "comb_cvd_dx")
+CreateTableOne(vars = vars, strata = "comb_ed_dx_pre", data = matched, test = F) %>% print(smd = T)
+
+# raw data - person years and CKD events in ED and non ED
+aggregate(matched$person_years_ed_ckd~matched$comb_ed_dx_pre, FUN=sum)
+aggregate(matched$person_years_noned_ckd~matched$comb_ed_dx_pre, FUN=sum)
+
+(matched[matched$comb_ed_dx_pre == T,]$comb_ckd_dx == T) %>% summary()
+(matched[matched$comb_ed_dx_pre == F,]$comb_ckd_dx == T) %>% summary()
+
+# raw data - person years and deaths in ED and non ED
+aggregate(matched$person_years_ed_death~matched$comb_ed_dx_pre, FUN=sum)
+aggregate(matched$person_years_noned_death~matched$comb_ed_dx_pre, FUN=sum)
+(matched[matched$comb_ed_dx_pre == T,]$dead == T) %>% summary()
+(matched[matched$comb_ed_dx_pre == F,]$dead == T) %>% summary()
+
+
+# same analyses in propensity score matched patients
+COEFS.ED.psm       <- SE.ED.psm   <-  COEFS.EDadj.psm <- SE.EDadj.psm <- rep(NA,n.imp)
+
+#create long dataframe with matched patients only
+td_dat_matched <- td_dat[td_dat$n_eid.imp %in% matched$n_eid.imp,]
+
+for (i in 1:n.imp) {
+  p <- coxph(Surv(tstart, tstop, ckd) ~ ed, 
+             data = td_dat_matched[td_dat_matched$.imp == i,])
+  p2 <- coxph(Surv(tstart, tstop, ckd) ~ ed + birth_cohort + BMI + ethnicity +
+                smoking_status + TDI + hypertension + diabetes + ihd + stroke, 
+              data = td_dat_matched[td_dat_matched$.imp == i,])
+  
+  COEFS.ED.psm[i] 	<- p$coefficients[1]
+  SE.ED.psm[i] 	    <- sqrt(p$var[1])
+  
+  COEFS.EDadj.psm[i] 	<- p2$coefficients[1]
+  SE.EDadj.psm[i] 	    <- sqrt(p2$var[1])
+  remove(p)
+  remove(p2)
+}
+# pool results
+Pool.rubin.HR(COEFS.ED.psm, SE.ED.psm, n.imp)
+Pool.rubin.HR(COEFS.EDadj.psm, SE.EDadj.psm, n.imp)
