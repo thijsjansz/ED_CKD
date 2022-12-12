@@ -1,8 +1,6 @@
-##### This code is part of the phenotype analysis. 
-##### It is one of three sources of diagnoses; i.e. GP records, the other two being and self-reported diagnoses.
-##### The two phenotypes that we will be looking into here, are earache, rash, joint ache/stiffness and ANCA associated vasculitis (ANCA).
-##### the diagnosis codes have been saved in .csv files that are also available on this repository.
-##### the output of this code is a file that will subsequently be transformed in STATA for easier collation with diagnoses from other sources (code: GP_diagnoses.do).
+# in this code I will retrieve diagnostic codes from primary care records linked to UKBB
+# the lists of read codes for each diagnosis are available as txt files in this repository (they have to be tab separated in order for R to read them properly -
+# there are strings containing quotes " and ' which would otherwise make it impossible to read them properly as .csv files.
 
 library(RMySQL)
 library(dplyr)
@@ -49,6 +47,8 @@ for (file in file_list) {
 
 
 lapply( dbListConnections( dbDriver( drv = "MySQL")), dbDisconnect)  
+
+# I also want to get the n_eid of participants with linkage to GP records so I can select these later on. I will do that below here.
 
 con=dbConnect(MySQL(),dbname="UKB_GP_RECORDS",password=pwd, user='tj358',host="slade.ex.ac.uk") 
 
