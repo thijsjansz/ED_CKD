@@ -1304,13 +1304,24 @@ td_dat2$event <- factor(temp, 0:2, labels=c("censor", "ckd", "death"))
 remove(temp)
 
 #fit a cause-specific cox proportional hazards model:
-cr.fit <- coxph(Surv(tstart, tstop, event) ~ ed, data=td_dat2, id=n_eid)
-summary(cr.fit)
+COEFS.cr.unadjusted        <- SE.cr.unadjusted   <- rep(NA,n.imp)
+COEFS.cr.adjusted          <- SE.cr.adjusted   <- rep(NA,n.imp)
+
+for (i in 1:n.imp) {
+cr.fit <- coxph(Surv(tstart, tstop, event) ~ ed, data=td_dat2[td_dat2$.imp == i,], id=n_eid)
+  COEFS.cr.unadjusted[i] 	<- cr.fit$coefficients[1]
+  SE.cr.unadjusted[i] 	    <- sqrt(cr.fit$var[1])
 #adjusted:
-cr.fit <- coxph(Surv(tstart, tstop, event) ~ ed + birth_cohort + 
+cr.fit2 <- coxph(Surv(tstart, tstop, event) ~ ed + birth_cohort + 
                   BMI + smoking_status + ethnicity + TDI + 
-                  diabetes + hypertension + ihd + stroke, data=td_dat2, id=n_eid)
-summary(cr.fit)
+                  diabetes + hypertension + ihd + stroke, data=td_dat2[td_dat2$.imp == i,], id=n_eid)
+  COEFS.cr.adjusted[i] 	<- cr.fit2$coefficients[1]
+  SE.cr.adjusted[i] 	    <- sqrt(cr.fit2$var[1])
+  }
+
+# pooled HR:
+Pool.rubin.HR(COEFS.cr.unadjusted, SE.cr.unadjusted, n.imp)
+Pool.rubin.HR(COEFS.cr.adjusted, SE.cr.adjusted, n.imp)
 
 #################################
 # 7.  PROPENSITY SCORE MATCHING
