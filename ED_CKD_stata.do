@@ -1,3 +1,7 @@
+***** STATA CODE - I am using stata to select variables from the main UKBB dataset as this works faster than in R. 
+***** I will then add primary care data and HES data and save this into a file I can further analyse using R.
+***** before running this code, the code ED_CKD_mysql.R will have to be run.
+
 ****** Hospital episode statistics *********
 
 foreach disease in  "ED""CKD" "DM" "HTN" "IHD" "CVD" "CHOL"{ 
