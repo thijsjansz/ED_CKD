@@ -68,3 +68,46 @@ df_all <- rbind(df, df_add)
 
 write.csv(df_all, "~/pilot/primarycaredata_available.csv", row.names = F)
 
+con=dbConnect(MySQL(),dbname = "UKB_GP_RECORDS",password=pwd, user ='tj358',host="slade.ex.ac.uk")
+
+query4 <- "SELECT n_eid, data_provider, reg_date, deduct_date FROM UKB_GP_RECORDS.gp_registrations_230K_171019;"
+df <- dbSendQuery(con, query4) %>% fetch(rsa, n=-1)
+
+
+
+#There are people with deregistration dates in the future or as NULL.
+#Katie recoded these to the last extraction date based on data provider:
+#i.	Data provider 1 (England Vision): 01/05/2017
+#ii.	Date provider 2 (Scotland): 01/04/2017
+#iii.	Data provider 3 (England TPP): 01/06/2016
+#iv.	Data provider 4 (Wales): 01/09/2017
+# I have written a code for this below.
+df$deduct_date <- ifelse(df$deduct_date == as.Date("2037-07-07", origin = "1970-01-01"), NA, as.Date(df$deduct_date, origin = "1970-01-01"))
+
+df$deduct_date <- ifelse(is.na(df$deduct_date), ifelse(
+  df$data_provider == 1, as.Date("2017-05-01", origin = "1970-01-01"), ifelse(
+    df$data_provider == 2, as.Date("2017-04-01", origin = "1970-01-01"), ifelse(
+      df$data_provider == 3, as.Date("2016-06-01", origin = "1970-01-01"), 
+      as.Date("2017-09-01", origin = "1970-01-01")
+    )
+  )
+),
+as.Date(df$deduct_date, origin = "1970-01-01")
+)
+
+df <- df[!is.na(df$reg_date)& !df$reg_date %in% c("1901-01-01", "1902-02-02", "1903-03-03"),] 
+df$reg_date <- as.Date(df$reg_date, origin = "1970-01-01")
+df <- df %>%
+  filter(reg_date != as.Date("2037-07-07")) %>%
+  group_by(n_eid) %>%
+  arrange(desc(reg_date)) %>%
+  slice_head(n = 1) %>%
+  mutate(deduct_date = last(deduct_date)) %>%
+  ungroup()
+df$deduct_date <- as.Date(df$deduct_date, origin = "1970-01-01")
+
+df <- df %>%  filter(reg_date <= deduct_date)
+
+write.csv(df, "~/pilot/registration_dates.csv", row.names = F)
+
+lapply( dbListConnections( dbDriver( drv = "MySQL")), dbDisconnect)
