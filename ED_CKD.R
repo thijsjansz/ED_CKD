@@ -25,12 +25,16 @@ library(Hmisc)
 library(MatchIt)
 library(tableone)
 ed_data <- as.data.frame(read_dta("~/pilot/R_ed_ckd_data.dta"))
-#select patients with available primary care data
-include <- read.csv("~/pilot/primarycaredata_available.csv", header = T)
-ed_data <- ed_data[ed_data$n_eid %in% include$n_eid,]
+
 #select males only
 n_females <- ed_data[ed_data$sex == 0,]$n_eid
 ed_data <- ed_data[ed_data$sex == 1,]
+
+#select patients with available primary care data
+include <- read.csv("~/pilot/primarycaredata_available.csv", header = T)
+ed_data <- ed_data[ed_data$n_eid %in% include$n_eid,]
+include <- include[include$n_eid %in% ed_data$n_eid,]
+
 #################################
 # 2A. PHENOTYPE ANALYSIS FOR ERECTILE DYSFUNCTION
 #################################
@@ -792,33 +796,46 @@ ed_data$comb_ed_dx_pre <-
 #as a sensitivity analysis I will look at concordance between diagnostic codes for CKD and eGFR measured at time of recruitment
 #in order to define a variable with eGFR at time of recruitment into UKBB, we will
 #need to calculate an estimated eGFR. The easiest way would be to calculate this 
-#with cystatin C, using the CKD-EPI 2012 Cystatin C equation.
-ed_data$lab_cystatinC <- ed_data$n_30720_0_0
+#with creatinine, using the CKD-EPI 2021  equation.
+ed_data <- rename(ed_data, lab_cystatinC = n_30720_0_0)
+ed_data <- rename(ed_data, lab_creatinine = n_30700_0_0)
 
 #define variable with age at recruitment
 ed_data$age_recruitment <- as.numeric(
-difftime(ed_data$ts_30721_0_0, ed_data$DOB, units = "days")/365.25)
+difftime(ed_data$ts_30701_0_0, ed_data$DOB, units = "days")/365.25
 )
 
-#calculate eGFR using the CKD-EPI 2012 Cystatin C equation,
+#calculate eGFR using the CKD-EPI 2021 Creatinine- Cystatin C equation,
 #then define a variable for diagnosis of CKD based on eGFR at time of recruitment
-ed_data$lab_egfr_cys_recr <- 133 * min(c(ed_data$lab_cystatinC/0.8, 1), na.rm = T)^-0.499 *
-max(c(ed_data$lab_cystatinC/0.8, 1), na.rm = T)^-1.328 * 0.996^ed_data$age_recruitment
-
-ed_data$ckd_recruitment <- ifelse(ed_data$lab_egfr_cys_recr < 60, T, F)
+ed_data$lab_egfr <- 135 * 0.9961^ed_data$age_recruitment *
+ifelse(ed_data$lab_creatinine*0.011312 < 0.9, ifelse(
+ed_data$lab_cystatinC < 0.8, 
+(ed_data$lab_creatinine*0.011312/0.9)^-0.144 * (ed_data$lab_cystatinC/0.8)^-0.323,
+(ed_data$lab_creatinine*0.011312/0.9)^-0.144 * (ed_data$lab_cystatinC/0.8)^-0.778),
+ifelse(ed_data$lab_cystatinC < 0.8,
+(ed_data$lab_creatinine*0.011312/0.9)^-0.544 * (ed_data$lab_cystatinC/0.8)^-0.323,
+(ed_data$lab_creatinine*0.011312/0.9)^-0.544 * (ed_data$lab_cystatinC/0.8)^-0.778
+))
+ed_data$ckd_recruitment <- ifelse(
+ed_data$lab_egfr < 60, T, F
+)
 
 #define discrepancies in diagnoses by comparing ckd_recruitment and comb_ckd_age:
 #set ckd age at 150 for those without a defined ckd age in order to run below ifelse() statements
 ed_data$temp_ckd_age <- ifelse(ed_data$comb_ckd_dx == F, 150, ed_data$comb_ckd_age)
 
 #define discrepancy as either no diagnostic code for CKD recorded whilst recruitment eGFR consistent with CKD, 
-#OR diagnostic code for CKD recorded but significantly later (>3 months) 
+#OR diagnostic code for CKD recorded but significantly later (>6 months) 
 #than time of recruitment when eGFR was already consistent with CKD.
-ed_data$discrepancy <- ifelse(ed_data$comb_ckd_dx == F & ed_data$ckd_recruitment == T, T, ifelse(
-  ed_data$comb_ckd_dx == T & ed_data$ckd_recruitment == T & ed_data$temp_ckd_age > ed_data$age_recruitment + 0.25,
+#however if participants had been censored before recruitment then they would obviously not count as discrepancy.
+ed_data$discrepancy <- ifelse(
+ed_data$age_censoring < ed_data$age_recruitment, F, ifelse(
+is.na(ed_data$comb_ckd_dx) & ed_data$ckd_recruitment == T | ed_data$comb_ckd_dx == F & ed_data$ckd_recruitment == T, T, ifelse(
+  ed_data$comb_ckd_dx == T & ed_data$ckd_recruitment == T & ed_data$temp_ckd_age > ed_data$age_recruitment + 0.5,
   T, F)
-)
+))
 
+ed_data$ckd_recruitment %>% summary()
 ed_data$discrepancy %>% summary()
 
 #################################
@@ -827,14 +844,24 @@ ed_data$discrepancy %>% summary()
 
 #for supplemental figure 1, I will show how I derived the current cohort from UKBB.
 #the total number of recruited participants was 502,536. 123 of these have withdrawn consent so have to substracted.
-#the number of people without a link to primary care data is then 502,413 MINUS nrow(include)
-#the number of people without a missing registration data in the primary care dataset: length(unknown_regdate)
-#the number of female participants: length(n_females)
-#the number of people with unknown age of onset of ED: length(ed_unknownage)
-#the number of people with age of onset of CKD < 35 years: length(ckd_before35)
-#the number of people with age of onset of ED < 35 years: length(ed_before35)
-#the number of people with CKD before 01/01/2000 length(ckd_before2000)
-#final number of subjects in study cohort: nrow(ed_data)
+#the number of female participants: 
+length(n_females)
+#the number of people without a link to primary care data is then 
+502413 - length(n_females) - length(include)
+#the number of people with missing registration data in the primary care dataset: 
+length(unknown_regdate)
+#the number of people with unknown age of onset of CKD: 
+length(ckd_unknownage)
+#the number of people with unknown age of onset of ED: 
+length(ed_unknownage)
+#the number of people with age of onset of CKD < 35 years: 
+length(ckd_before35)
+#the number of people with age of onset of ED < 35 years: 
+length(ed_before35)
+#the number of people with CKD before 01/01/2000 
+length(ckd_before2000)
+#final number of subjects in study cohort: 
+nrow(ed_data)
 
 #data for baseline table
 #data for patients with ED
@@ -1118,9 +1145,9 @@ print(hr.ed)
 # adjusted HR for CKD in patients with HTN:
 hr.interaction <- Pool.rubin.HR(COEFS.interaction, SE.interaction, n.imp)
 hr.interaction_final <- hr.interaction[1] * hr.ed[1]
-se.coef.interaction_final <- sqrt((mean(SE.interaction^2) + (1+1/n.imp)*var(COEFS.interaction)) +
-                                              log(hr.interaction_final)^2 *
-                                              (mean(SE.ed^2) + (1+1/n.imp)*var(COEFS.ed)))
+se.coef.interaction_final <- sqrt(log(hr.interaction_final)^2 *
+					      (mean(SE.interaction^2) + (1+1/n.imp)*var(COEFS.interaction) +
+                                               mean(SE.adjusted^2) + (1+1/n.imp)*var(COEFS.adjusted)))
 conf.int.hr.interaction_final <- exp(c(log(hr.interaction_final) - 1.96 * 
                                                se.coef.interaction_final, 
                                              log(hr.interaction_final) + 1.96 *
@@ -1176,9 +1203,9 @@ print(hr.cr.ed)
 # adjusted HR for CKD in patients with HTN:
 hr.cr.interaction <- Pool.rubin.HR(COEFS.cr.interaction, SE.cr.interaction, n.imp)
 hr.cr.interaction_final <- hr.cr.interaction[1] * hr.cr.ed[1]
-se.coef.cr.interaction_final <- sqrt((mean(SE.cr.interaction^2) + (1+1/n.imp)*var(COEFS.cr.interaction)) +
-                                              log(hr.cr.interaction_final)^2 *
-                                              (mean(SE.cr.adjusted^2) + (1+1/n.imp)*var(COEFS.cr.adjusted)))
+se.coef.cr.interaction_final <- sqrt(log(hr.cr.interaction_final)^2 *
+					(mean(SE.cr.interaction^2) + (1+1/n.imp)*var(COEFS.cr.interaction) +
+                                         mean(SE.cr.adjusted^2) + (1+1/n.imp)*var(COEFS.cr.adjusted)))
 conf.int.hr.cr.interaction_final <- exp(c(log(hr.cr.interaction_final) - 1.96 * 
                                                se.coef.cr.interaction_final,
                                              log(hr.cr.interaction_final) + 1.96 *
@@ -1270,8 +1297,6 @@ for (i in 1:n.imp) {
   SE.adj.psm[i] <- sqrt(psm2$var[1])
   COEFS.interaction.psm[i] <- psm2$coefficients[15]
   SE.interaction.psm[i] <- sqrt(abs(psm2$var[15,15]))
-  remove(psm)
-  remove(psm2)
   
   #run a cause-specific cox PH as well for competing risk of death:
   cr.fit.matched <- coxph(Surv(tstart, tstop, event) ~ ed, data=td_dat2_matched[td_dat2_matched$.imp == i,], id=n_eid)
@@ -1283,10 +1308,8 @@ for (i in 1:n.imp) {
                              diabetes + ihd + stroke, data=td_dat2_matched[td_dat2_matched$.imp == i,], id=n_eid)
   COEFS.cr.adj.psm[i] <- cr.fit.matched2$coefficients[1]
   SE.cr.adj.psm[i] <- sqrt(cr.fit.matched2$var[1])
-  COEFS.cr.interaction.psm[i] <- cr.fit.matched$coefficients[15]
-  SE.cr.interaction.psm[i] <- sqrt(abs(cr.fit.matched$var[15,15]))
-  remove(cr.fit.matched)
-  remove(cr.fit.matched2)
+  COEFS.cr.interaction.psm[i] <- cr.fit.matched2$coefficients[15]
+  SE.cr.interaction.psm[i] <- sqrt(abs(cr.fit.matched2$var[15,15]))
 }
 # pool results:
 hr.psm.ed <- Pool.rubin.HR(COEFS.adj.psm, SE.adj.psm, n.imp)
@@ -1294,9 +1317,9 @@ hr.psm.interaction <- Pool.rubin.HR(COEFS.interaction.psm, SE.interaction.psm, n
 
 hr.psm.interaction_final <- hr.psm.interaction[1] * hr.psm.ed[1]
 
-se.psm.coef.interaction_final <- sqrt((mean(SE.interaction.psm^2) + (1+1/n.imp)*var(COEFS.interaction.psm)) +
-                                              log(hr.psm.interaction_final)^2 *
-                                              (mean(SE.adj.psm^2) + (1+1/n.imp)*var(COEFS.adj.psm)))
+se.psm.coef.interaction_final <- sqrt(log(hr.psm.interaction_final)^2 *
+					(mean(SE.interaction.psm^2) + (1+1/n.imp)*var(COEFS.interaction.psm) +
+                                         mean(SE.adj.psm^2) + (1+1/n.imp)*var(COEFS.adj.psm)))
 
 
 conf.int.hr.psm.interaction_final <- exp(c(log(hr.psm.interaction_final) - 1.96 * 
@@ -1308,9 +1331,9 @@ hr.cr.psm.interaction <- Pool.rubin.HR(COEFS.cr.interaction.psm, SE.cr.interacti
 
 hr.cr.psm.interaction_final <- hr.cr.psm.interaction[1] * hr.cr.psm.ed[1]
 
-se.cr.psm.coef.interaction_final <- sqrt((mean(SE.cr.interaction.psm^2) + (1+1/n.imp)*var(COEFS.cr.interaction.psm)) +
-                                              log(hr.cr.psm.interaction_final)^2 *
-                                              (mean(SE.cr.adj.psm^2) + (1+1/n.imp)*var(COEFS.cr.adj.psm)))
+se.cr.psm.coef.interaction_final <- sqrt(log(hr.cr.psm.interaction_final)^2 *
+					(mean(SE.cr.interaction.psm^2) + (1+1/n.imp)*var(COEFS.cr.interaction.psm) +
+                                         mean(SE.cr.adj.psm^2) + (1+1/n.imp)*var(COEFS.cr.adj.psm)))
 
 
 conf.int.hr.cr.psm.interaction_final <- exp(c(log(hr.cr.psm.interaction_final) - 1.96 * 
@@ -1356,24 +1379,27 @@ dummy4 <- dummy4[-c(1:2),]
 dummy_list <- list(dummy1, dummy2, dummy3, dummy4)
 
 # loop through the list of dummy datasets and create a survival curve for each
+par(mfrow=c(2,2))
 for (i in 1:length(dummy_list)) {
   csurv <- survfit(m2, newdata = dummy_list[[i]], start = dummy_list[[i]][1,1],
                    conf.type = "log", conf.int = 0.95, conf.method = "breslow")
   plot(csurv, xlim = c(dummy_list[[i]][1,1],dummy_list[[i]][1,1]+10), xscale = 1, ylim = c(0.9, 1),
        xlab = "Age", ylab = "CKD-free survival",
        col = c("firebrick1", "firebrick1", "dodgerblue", "dodgerblue", "chartreuse3", "chartreuse3"), lty = c(2:1), lwd = 2)
-  legend(dummy_list[[i]][1,1], 0.95, c("ED + HTN", "HTN", "ED + DM", "DM", "ED", "None"),
-         cex = 0.7, col = c("firebrick1", "firebrick1", "dodgerblue", "dodgerblue", "chartreuse3", "chartreuse3"), lty = 2:1, bty = 'n', lwd = 2)
+#  legend(dummy_list[[i]][1,1], 0.95, c("ED + HTN", "HTN", "ED + DM", "DM", "ED", "None"),
+#         cex = 0.7, col = c("firebrick1", "firebrick1", "dodgerblue", "dodgerblue", "chartreuse3", "chartreuse3"), lty = 2:1, bty = 'n', lwd = 2)
   title(paste("Age", dummy_list[[i]][1,1]))
 }
 
 #to present a cumulative incidence curve, we can use the same hypothetical subjects as used above.
+par(mfrow=c(2,2))
 for (i in 1:length(dummy_list)) {
   csurv2 <- survfit(cr.fit2, newdata=dummy_list[[i]], start = dummy_list[[i]][1,1], conf.type = "log", conf.int = 0.95, conf.method = "breslow")
   #Predicted cumulative CKD incidence curves.
-  plot(csurv2[,'ckd'], xlim = c(dummy_list[[i]][1,1],dummy_list[[i]][1,1]+10), xscale=1, xlab="Age", ylab="Cumulative CKD incidence", 
+  plot(csurv2[,'ckd'], xlim = c(dummy_list[[i]][1,1],dummy_list[[i]][1,1]+10), xscale=1, ylim = c(0, 0.07),
+       xlab="Age", ylab="Cumulative CKD incidence", 
        col = c("firebrick1", "firebrick1", "dodgerblue", "dodgerblue", "chartreuse3", "chartreuse3"), lty = c(2:1), lwd = 2)
-  legend(dummy_list[[i]][1,1], 0.95, c("ED + HTN", "HTN", "ED + DM", "DM", "ED", "None"),
-         cex = 0.7, col = c("firebrick1", "firebrick1", "dodgerblue", "dodgerblue", "chartreuse3", "chartreuse3"), lty = 2:1, bty = 'n', lwd = 2)
+#  legend(dummy_list[[i]][1,1], 0.95, c("ED + HTN", "HTN", "ED + DM", "DM", "ED", "None"),
+#         cex = 0.7, col = c("firebrick1", "firebrick1", "dodgerblue", "dodgerblue", "chartreuse3", "chartreuse3"), lty = 2:1, bty = 'n', lwd = 2)
   title(paste("Age", dummy_list[[i]][1,1]))
 }
