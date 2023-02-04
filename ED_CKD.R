@@ -1113,8 +1113,9 @@ for (i in 1:n.imp) {
   #same as above:
   COEFS.adjusted[i] <- m2$coefficients[1]
   SE.adjusted[i] <- sqrt(m2$var[1])
-  COEFS.interaction[i] <- m2$coefficients[15]
-  SE.interaction[i] <- sqrt(abs(m2$var[15,15]))
+  COEFS.interaction[i] <- m2$coefficients[1] + m2$coefficients[15]
+  SE.interaction[i] <- sqrt(abs(m2$var[1]) + abs(m2$var[15,15]) + 2 * vcov(m2)[1,15])
+
 }
 # will then write a function to pool the results from each of these imputed datasets
 Pool.rubin.HR <- function(COEFS,SE,n.imp){
@@ -1140,19 +1141,9 @@ Pool.rubin.HR <- function(COEFS,SE,n.imp){
 # HR for CKD unadjusted:
 Pool.rubin.HR(COEFS.unadjusted, SE.unadjusted, n.imp)
 # adjusted HR for CKD (without hypertension):
-hr.ed <- Pool.rubin.HR(COEFS.adjusted, SE.adjusted, n.imp)
-print(hr.ed)
+Pool.rubin.HR(COEFS.adjusted, SE.adjusted, n.imp)
 # adjusted HR for CKD in patients with HTN:
-hr.interaction <- Pool.rubin.HR(COEFS.interaction, SE.interaction, n.imp)
-hr.interaction_final <- hr.interaction[1] * hr.ed[1]
-se.coef.interaction_final <- sqrt(log(hr.interaction_final)^2 *
-					      (mean(SE.interaction^2) + (1+1/n.imp)*var(COEFS.interaction) +
-                                               mean(SE.adjusted^2) + (1+1/n.imp)*var(COEFS.adjusted)))
-conf.int.hr.interaction_final <- exp(c(log(hr.interaction_final) - 1.96 * 
-                                               se.coef.interaction_final, 
-                                             log(hr.interaction_final) + 1.96 *
-                                               se.coef.interaction_final))
-print(c(hr.interaction_final, conf.int.hr.interaction_final))
+Pool.rubin.HR(COEFS.interaction, SE.interaction, n.imp)
 
 # now we will run the same analyses in the cause-specific cox model allowing for competing risk of death:
 td_dat2 <-
@@ -1191,26 +1182,16 @@ for (i in 1:n.imp) {
                      diabetes + ihd + stroke, data=td_dat2[td_dat2$.imp == i,], id=n_eid)
   COEFS.cr.adjusted[i] <- cr.fit2$coefficients[1]
   SE.cr.adjusted[i] <- sqrt(cr.fit2$var[1])
-  COEFS.cr.interaction[i] <- cr.fit2$coefficients[15]
-  SE.cr.interaction[i] <- sqrt(abs(cr.fit2$var[15,15]))
+  COEFS.cr.interaction[i] <- cr.fit2$coefficients[1] + cr.fit2$coefficients[15]
+  SE.cr.interaction[i] <- sqrt(abs(cr.fit2$var[1]) + abs(cr.fit2$var[15,15]) + 2 * vcov(cr.fit2)[1,15])
+
 }
-# pooled HRs (unadjusted; adjusted; for people comorbid with HTN):
-# HR for CKD unadjusted:
+# pooled HRs (unadjusted; adjusted for people without and with HTN):
 Pool.rubin.HR(COEFS.cr.unadjusted, SE.cr.unadjusted, n.imp)
 # adjusted HR for CKD (without hypertension):
-hr.cr.ed <- Pool.rubin.HR(COEFS.cr.adjusted, SE.cr.adjusted, n.imp)
-print(hr.cr.ed)
+Pool.rubin.HR(COEFS.cr.adjusted, SE.cr.adjusted, n.imp)
 # adjusted HR for CKD in patients with HTN:
-hr.cr.interaction <- Pool.rubin.HR(COEFS.cr.interaction, SE.cr.interaction, n.imp)
-hr.cr.interaction_final <- hr.cr.interaction[1] * hr.cr.ed[1]
-se.coef.cr.interaction_final <- sqrt(log(hr.cr.interaction_final)^2 *
-					(mean(SE.cr.interaction^2) + (1+1/n.imp)*var(COEFS.cr.interaction) +
-                                         mean(SE.cr.adjusted^2) + (1+1/n.imp)*var(COEFS.cr.adjusted)))
-conf.int.hr.cr.interaction_final <- exp(c(log(hr.cr.interaction_final) - 1.96 * 
-                                               se.coef.cr.interaction_final,
-                                             log(hr.cr.interaction_final) + 1.96 *
-                                               se.coef.cr.interaction_final))
-print(c(hr.cr.interaction_final, conf.int.hr.cr.interaction_final))
+Pool.rubin.HR(COEFS.cr.interaction, SE.cr.interaction, n.imp)
 
 #################################
 # 7. PROPENSITY SCORE MATCHING
@@ -1295,8 +1276,9 @@ for (i in 1:n.imp) {
   SE.unadj.psm[i] <- sqrt(psm$var[1])
   COEFS.adj.psm[i] <- psm2$coefficients[1]
   SE.adj.psm[i] <- sqrt(psm2$var[1])
-  COEFS.interaction.psm[i] <- psm2$coefficients[15]
-  SE.interaction.psm[i] <- sqrt(abs(psm2$var[15,15]))
+  COEFS.interaction.psm[i] <- psm2$coefficients[1] + psm2$coefficients[15]
+  SE.interaction.psm[i] <- sqrt(abs(psm2$var[1]) + abs(psm2$var[15,15]) + 2 * vcov(psm2)[1,15])
+
   
   #run a cause-specific cox PH as well for competing risk of death:
   cr.fit.matched <- coxph(Surv(tstart, tstop, event) ~ ed, data=td_dat2_matched[td_dat2_matched$.imp == i,], id=n_eid)
@@ -1308,52 +1290,24 @@ for (i in 1:n.imp) {
                              diabetes + ihd + stroke, data=td_dat2_matched[td_dat2_matched$.imp == i,], id=n_eid)
   COEFS.cr.adj.psm[i] <- cr.fit.matched2$coefficients[1]
   SE.cr.adj.psm[i] <- sqrt(cr.fit.matched2$var[1])
-  COEFS.cr.interaction.psm[i] <- cr.fit.matched2$coefficients[15]
-  SE.cr.interaction.psm[i] <- sqrt(abs(cr.fit.matched2$var[15,15]))
+  COEFS.cr.interaction.psm[i] <- cr.fit.matched2$coefficients[1] + cr.fit.matched2$coefficients[15]
+  SE.cr.interaction.psm[i] <- sqrt(abs(cr.fit.matched2$var[1]) + abs(cr.fit.matched2$var[15,15]) + 2 * vcov(cr.fit.matched2)[1,15])
+
 }
 # pool results:
-hr.psm.ed <- Pool.rubin.HR(COEFS.adj.psm, SE.adj.psm, n.imp)
-hr.psm.interaction <- Pool.rubin.HR(COEFS.interaction.psm, SE.interaction.psm, n.imp)
-
-hr.psm.interaction_final <- hr.psm.interaction[1] * hr.psm.ed[1]
-
-se.psm.coef.interaction_final <- sqrt(log(hr.psm.interaction_final)^2 *
-					(mean(SE.interaction.psm^2) + (1+1/n.imp)*var(COEFS.interaction.psm) +
-                                         mean(SE.adj.psm^2) + (1+1/n.imp)*var(COEFS.adj.psm)))
-
-
-conf.int.hr.psm.interaction_final <- exp(c(log(hr.psm.interaction_final) - 1.96 * 
-                                               se.psm.coef.interaction_final, 
-                                             log(hr.psm.interaction_final) + 1.96 *
-                                               se.psm.coef.interaction_final))
-hr.cr.psm.ed <- Pool.rubin.HR(COEFS.cr.adj.psm, SE.cr.adj.psm, n.imp)
-hr.cr.psm.interaction <- Pool.rubin.HR(COEFS.cr.interaction.psm, SE.cr.interaction.psm, n.imp)
-
-hr.cr.psm.interaction_final <- hr.cr.psm.interaction[1] * hr.cr.psm.ed[1]
-
-se.cr.psm.coef.interaction_final <- sqrt(log(hr.cr.psm.interaction_final)^2 *
-					(mean(SE.cr.interaction.psm^2) + (1+1/n.imp)*var(COEFS.cr.interaction.psm) +
-                                         mean(SE.cr.adj.psm^2) + (1+1/n.imp)*var(COEFS.cr.adj.psm)))
-
-
-conf.int.hr.cr.psm.interaction_final <- exp(c(log(hr.cr.psm.interaction_final) - 1.96 * 
-                                               se.cr.psm.coef.interaction_final, 
-                                             log(hr.cr.psm.interaction_final) + 1.96 *
-                                               se.cr.psm.coef.interaction_final))
-
-#propensity score matched analysis in simple cox regression model:
+#unadjusted HR
 Pool.rubin.HR(COEFS.unadj.psm, SE.unadj.psm, n.imp)
-#propensity score matched HR in simple cox regression model with (doubly robust) adjustment:
-print(hr.psm.ed)
-#propensity score matched HR for subjects with HTN in simple cox regression model with (doubly robust) adjustment:
-print(c(hr.psm.interaction_final, conf.int.hr.psm.interaction_final))
+#adjusted HR in subjects without HTN
+Pool.rubin.HR(COEFS.adj.psm, SE.adj.psm, n.imp)
+#adjusted HR in subjects with HTN
+Pool.rubin.HR(COEFS.interaction.psm, SE.interaction.psm, n.imp)
+
 #propensity score matched analysis in cause-specific cox regression model with competing risk of death:
 Pool.rubin.HR(COEFS.cr.unadj.psm, SE.cr.unadj.psm, n.imp)
 #propensity score matched analysis in cause-specific cox regression model with competing risk of death and (doubly robust) adjustment:
-print(hr.cr.psm.ed)
+Pool.rubin.HR(COEFS.cr.adj.psm, SE.cr.adj.psm, n.imp)
 #propensity score matched HR for subjects with HTN in cause-specific cox regression model with competing risk of death and (doubly robust) adjustment:
-print(c(hr.cr.psm.interaction_final, conf.int.hr.cr.psm.interaction_final))
-
+Pool.rubin.HR(COEFS.cr.interaction.psm, SE.cr.interaction.psm, n.imp)
 #################################
 # 8. FIGURES
 #################################
