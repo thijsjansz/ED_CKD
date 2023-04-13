@@ -156,8 +156,8 @@ set maxvar 64000
 
 use n_eid ts_53_0_0 n_52_0_0 n_31_0_0 n_34_0_0 n_189_0_0 n_1647_* n_22011_0_0 n_22012_0_0 n_21001_0_0 n_20002_* n_20009_* n_21000_0_0 n_22001_0_0 n_20116_* s_40001_* s_40002_* ts_40000_* s_41204* n_22004_0_0 n_22005_0_0 n_22006_0_0 n_22010_0_0 using "/slade/local/UKBB/phenotype_data/master/main_data/raw_data_2019.dta"
 
-* add cystatin C levels
-merge 1:1 n_eid using "/slade/projects/UKBB/phenotype_data/master/main_data/biomarkers_2019.dta", keepusing(n_30720_0_0 ts_30721_0_0 n_30700_0_0 ts_30701_0_0)
+* add creatinine levels / ACR
+merge 1:1 n_eid using "/slade/projects/UKBB/phenotype_data/master/main_data/biomarkers_2019.dta", keepusing(n_30720_0_0 ts_30721_0_0 n_30700_0_0 ts_30701_0_0 n_30500_0_0)
 
 
 ***** add data on date of first occurrence
