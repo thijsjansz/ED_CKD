@@ -4,7 +4,7 @@
 
 ****** Hospital episode statistics *********
 
-foreach disease in  "ED""CKD" "DM" "HTN" "IHD" "CVD" "CHOL"{ 
+foreach disease in  "ED""CKD" "DM" "HTN" "IHD" "CVD"{ 
 clear 
 set maxvar 64000
 
@@ -41,10 +41,6 @@ if `"`disease'"' == "ED" {
 		local icd10 = "I630 I631 I632 I633 I634 I635 I636 I638 I639 I64X G450 G451 G452 G453  G458 G459 G460A G461A G462A G463A G464A G465A G466A G467A G468A" /*  */
 	}
 	
-			if "`disease'" == "CHOL" {
-		local dis="chol"
-		local icd10 = "E780 E782 E784 E785" /* pure hypercholesterolaemia, mixed, other, and unspecified hyperlipidaemia */
-	}
 	
 	
 	generate hes_flag_`dis' = .
@@ -104,7 +100,7 @@ clear
 
 ******* GP records *********
 
-foreach disease in  "ED""CKD" "DM" "HTN" "IHD" "CVD" "CHOL"{ 
+foreach disease in  "ED""CKD" "DM" "HTN" "IHD" "CVD" { 
 
 set maxvar 64000
 
@@ -126,9 +122,7 @@ if "`disease'" == "IHD" {
 if "`disease'" == "CVD" {
 		local dis="cvd"
 	}
-if "`disease'" == "CHOL" {
-		local dis="chol"
-	}
+
 import delimited using "/slade/home/tj358/pilot/`dis'_gpcases.tsv"
 
 */ date into readable format: */
@@ -189,9 +183,7 @@ if "`disease'" == "IHD" {
 if "`disease'" == "CVD" {
 		local dis="cvd"
 	}
-if "`disease'" == "CHOL" {
-		local dis="chol"
-	}
+
 merge 1:1 n_eid using "/slade/home/tj358/pilot/`dis'_gp_only.dta", generate(`dis'_gp_merge)
 drop if `dis'_gp_merge ==2
 drop `dis'_gp_merge
@@ -221,15 +213,8 @@ rename n_20116_2_0 smoking_status_2
 rename n_1647_0_0 country_of_birth
 
 ** Dropping participants 
-*drop if exclusion ==1 *we do not have to drop these participants per se if we are not doing genetic analyses yet
+
 drop if sex ==. & genetic_sex==.
-
-* Sorting by genetic relatedeness pairings and dropping one of each pair if kinship coefficient > 0.0844
-sort n_22011_0_0, stable
-by n_22011_0_0: generate order_kin= _n
-*drop if order_kin >= 2 & n_22012_0_0 > 0.0844 & n_22011_0_0!=. * same here - only consider dropping if we are going to do genetic analyses
-drop order_kin 
-
 
 * removing participants who have withdrawn from the UKBB 
 run "/slade/local/UKBB/phenotype_data/scripts/do_files/withdrawn_participants.do"
