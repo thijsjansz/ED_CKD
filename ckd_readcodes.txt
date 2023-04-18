@@ -13,16 +13,34 @@
 1Z1F.	Chronic kidney disease stage 3B with proteinuria
 1Z1G.	Chronic kidney disease stage 3B without proteinuria
 1Z1G.	Chronic kidney disease stage 3B without proteinuria
+1Z1T.	CKD with GFR category G3a & albuminuria category A1
+1Z1V.	CKD with GFR category G3a & albuminuria category A2
+1Z1W.	CKD with GFR category G3a & albuminuria category A3
+1Z1X.	CKD with GFR category G3b & albuminuria category A1
+1Z1Y.	CKD with GFR category G3b & albuminuria category A2
+1Z1Z.	CKD with GFR category G3b & albuminuria category A3
+K053.	Chronic kidney disease stage 3
 1Z13.	Chronic kidney disease stage 4
 1Z1H.	Chronic kidney disease stage 4 with proteinuria
 1Z1H.	Chronic kidney disease stage 4 with proteinuria
 1Z1J.	Chronic kidney disease stage 4 without proteinuria
 1Z1J.	Chronic kidney disease stage 4 without proteinuria
+1Z1a	CKD with GFR category G4 & albuminuria category A1
+1Z1b	CKD with GFR category G4 & albuminuria category A2
+1Z1c	CKD with GFR category G4 & albuminuria category A3
+K054	Chronic kidney disease stage 4
 1Z14.	Chronic kidney disease stage 5
 1Z1K.	Chronic kidney disease stage 5 with proteinuria
 1Z1K.	Chronic kidney disease stage 5 with proteinuria
 1Z1L.	Chronic kidney disease stage 5 without proteinuria
 1Z1L.	Chronic kidney disease stage 5 without proteinuria
+1Z1d	CKD with GFR category G5 & albuminuria category A1
+1Z1e	CKD with GFR category G5 & albuminuria category A2
+1Z1f	CKD with GFR category G5 & albuminuria category A3
+G233	Hypertensive heart and renal disease with renal failure
+G234	Hyperten heart&renal dis+both(congestv)heart and renal fail
+K050	End stage renal failure
+K055	Chronic kidney disease stage 5
 14S2.	H/O: kidney recipient
 7A600	Insertion of arteriovenous prosthesis
 7A602	Attention to arteriovenous shunt
