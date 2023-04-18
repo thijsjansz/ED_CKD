@@ -18,7 +18,7 @@ if `"`disease'"' == "ED" {
 	
 		if "`disease'" == "CKD" {
 		local dis="ckd"
-		local icd10 = "I120 I130 I131 I132 I139 N180 N188 N189 N19X Y841 Z491 Z492 Z992 T861 Z940 N165A Z490" /* the codes starting with I1 refer to hypertensive disease with renal failure; the codes starting with N1 refer to chronic renal failure. Y841 = kidney dialysis, Z491 = extracorporeal dialysis, Z492 = other dialysis, Z992 = dependence on renal dialysis, T861 = kidney transplant failure and rejection, Z940 = kidney transplant status, N165A = renal tubulointerstitial disorders in transplant rejection, Z490 = preparatory care for dialysis */
+		local icd10 = "I120 I130 I131 I132 I139 N180 N183 N184 N185 N188 N189 N19X Y841 Z491 Z492 Z992 T861 Z940 N165A Z490" /* the codes starting with I1 refer to hypertensive disease with renal failure; the codes starting with N1 refer to chronic renal failure. Y841 = kidney dialysis, Z491 = extracorporeal dialysis, Z492 = other dialysis, Z992 = dependence on renal dialysis, T861 = kidney transplant failure and rejection, Z940 = kidney transplant status, N165A = renal tubulointerstitial disorders in transplant rejection, Z490 = preparatory care for dialysis */
 	}
 	
 		if "`disease'" == "DM" {
