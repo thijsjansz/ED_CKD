@@ -1,5 +1,4 @@
 ########### ED_CKD_main.R ###########
-# THIS CODE HAS BEEN WRITTEN TO ANALYSE THE RELATIONSHIP BETWEEN ERECTILE DYSFUNCTION AND CKD
 ########### CONTENTS ###########
 # 1. LOADING DATA FROM STATA
 # 2A. PHENOTYPE ANALYSIS FOR ERECTILE DYSFUNCTION
@@ -25,6 +24,11 @@ library(Hmisc)
 library(MatchIt)
 library(tableone)
 ed_data <- as.data.frame(read_dta("~/pilot/R_ed_ckd_data.dta"))
+total <- ed_data$n_eid
+
+#remove withdrawn participants
+withdrawn <- ed_data[!is.na(ed_data$withdrawn),]$n_eid
+ed_data <- ed_data[!ed_data$n_eid %in% withdrawn,]
 
 #select males only
 n_females <- ed_data[ed_data$sex == 0,]$n_eid
@@ -32,8 +36,9 @@ ed_data <- ed_data[ed_data$sex == 1,]
 
 #select patients with available primary care data
 include <- read.csv("~/pilot/primarycaredata_available.csv", header = T)
+exclude <- ed_data[!ed_data$n_eid %in% include$n_eid,]$n_eid
 ed_data <- ed_data[ed_data$n_eid %in% include$n_eid,]
-include <- include[include$n_eid %in% ed_data$n_eid,]
+remove(include)
 
 #################################
 # 2A. PHENOTYPE ANALYSIS FOR ERECTILE DYSFUNCTION
@@ -730,9 +735,9 @@ ed_data$age_censoring <- ifelse(ed_data$dead == F, ed_data$age_censoring, ifelse
   ed_data$dead == T & ed_data$ts_40000_0_0 <= ed_data$date_gp_dereg + (1/12), 
   NA, ifelse(
     ed_data$dead == T & ed_data$ts_40000_0_0 > ed_data$date_gp_dereg + (1/12),
-  (difftime(ed_data$date_gp_dereg, 
-            ed_data$DOB, units = "days")/365.25), ed_data$age_censoring
-)))
+    (difftime(ed_data$date_gp_dereg, 
+              ed_data$DOB, units = "days")/365.25), ed_data$age_censoring
+  )))
 
 #if participants died within a month of their primary care records ending, do not censor and count as death.
 ed_data$age_censoring <- ifelse(is.na(ed_data$age_dead), ed_data$age_censoring, ifelse(
@@ -768,6 +773,12 @@ ed_data$age_event <- pmin(ed_data$age_dead, ed_data$comb_ckd_age, ed_data$age_ce
 #for the cause-specific models (with death as competing risk), we will create a new variable called age_event2 so that follow up only ends when a participant dies or at end of follow up (not when they get CKD).
 ed_data$age_event2 <- pmin(ed_data$age_dead, ed_data$age_censoring, na.rm = T)
 
+#change comorbidities to during follow up
+ed_data$comb_hypertension_dx <- ifelse(ed_data$comb_hypertension_age > ed_data$age_event, F, ed_data$comb_hypertension_dx)
+ed_data$comb_diabetes_dx <- ifelse(ed_data$comb_diabetes_age > ed_data$age_event, F, ed_data$comb_diabetes_dx)
+ed_data$comb_ihd_dx <- ifelse(ed_data$comb_ihd_age > ed_data$age_event, F, ed_data$comb_ihd_dx)
+ed_data$comb_cvd_dx <- ifelse(ed_data$comb_cvd_age > ed_data$age_event, F, ed_data$comb_cvd_dx)
+
 #create a variable called age_start, as it would not make sense to start looking at people from before the age of 35.
 ed_data$age_start <- 35
 #and I will exclude people who had CKD or ED before the age of 35.
@@ -782,7 +793,6 @@ ed_data$date_trunc <- ifelse(ed_data$date_gp_reg < as.Date("2000-01-01", origin 
                              ed_data$date_gp_reg)  %>% as.Date(origin = "1970-01-01")
 ed_data$age_trunc <- as.numeric(difftime(ed_data$date_trunc, ed_data$DOB, units = "days")/365.25)
 ed_data$age_start <- ifelse(ed_data$age_start < ed_data$age_trunc, ed_data$age_trunc, ed_data$age_start)
-
 #and we will remove cases where people had CKD before this date as they would no longer be at risk
 ckd_before2000 <- ed_data[ed_data$age_event <= ed_data$age_start,]$n_eid %>% na.omit()
 ed_data <- ed_data[!ed_data$n_eid %in% ckd_before2000,]
@@ -794,18 +804,42 @@ ed_data$comb_ed_dx_pre <-
   ))
 
 
+#create variables for matching:
+ed_data$matching_age <- ifelse(ed_data$comb_ed_dx_pre == T, ed_data$comb_ed_age, ed_data$age_start)
+ed_data$matching_hypertension <- ifelse(ed_data$comb_ed_dx_pre == T,
+                                        ifelse(ed_data$comb_hypertension_age < ed_data$comb_ed_age, T, F),
+                                        ifelse(ed_data$comb_hypertension_age < ed_data$age_start, T, F)) %>% coalesce(F)
+ed_data$matching_diabetes <- ifelse(ed_data$comb_ed_dx_pre == T,
+                                    ifelse(ed_data$comb_diabetes_age < ed_data$comb_ed_age, T, F),
+                                    ifelse(ed_data$comb_diabetes_age < ed_data$age_start, T, F)) %>% coalesce(F)
+ed_data$matching_ihd <- ifelse(ed_data$comb_ed_dx_pre == T,
+                               ifelse(ed_data$comb_ihd_age < ed_data$comb_ed_age, T, F),
+                               ifelse(ed_data$comb_ihd_age < ed_data$age_start, T, F)) %>% coalesce(F)
+ed_data$matching_cvd <- ifelse(ed_data$comb_ed_dx_pre == T,
+                               ifelse(ed_data$comb_cvd_age < ed_data$comb_ed_age, T, F),
+                               ifelse(ed_data$comb_cvd_age < ed_data$age_start, T, F)) %>% coalesce(F)
+ed_data$comb_hypertension_dx <- ed_data$comb_hypertension_dx %>% coalesce(F)
+ed_data$comb_diabetes_dx <- ed_data$comb_diabetes_dx %>% coalesce(F)
+ed_data$comb_ihd_dx <- ed_data$comb_ihd_dx %>% coalesce(F)
+ed_data$comb_cvd_dx <- ed_data$comb_cvd_dx %>% coalesce(F)
+
 #################################
 # 4. TABLES
 #################################
 
 #for supplemental figure 1, I will show how I derived the current cohort from UKBB.
-#the total number of recruited participants was 502,536. 123 of these have withdrawn consent so have to substracted.
+#the total number of recruited participants was:
+length(total)
+#number of people who withdrew consent:
+length(withdrawn)
 #the number of female participants: 
 length(n_females)
 #the number of people without a link to primary care data is then 
-502413 - length(n_females) - length(include)
+length(exclude)
 #the number of people with missing registration data in the primary care dataset: 
 length(unknown_regdate)
+#the number of people with registration data before start of follow up:
+length(gp_deregdate_before2000)
 #the number of people with unknown age of onset of CKD: 
 length(ckd_unknownage)
 #the number of people with unknown age of onset of ED: 
@@ -847,15 +881,21 @@ ed_data[ed_data$comb_ed_dx_pre == T,]$comb_ckd_dx %>% summary()
 
 #data for patients without ED
 ed_data[ed_data$comb_ed_dx_pre == F,]$birth_cohort %>% summary()
+ed_data[ed_data$comb_ed_dx_pre == F,]$age_start %>% summary()
+ed_data[ed_data$comb_ed_dx_pre == F,]$age_start %>% sd()
 ed_data[ed_data$comb_ed_dx_pre == F,]$smoking_status %>% as.factor() %>% summary()
 ed_data[ed_data$comb_ed_dx_pre == F,]$TDI %>% summary()
 ed_data[ed_data$comb_ed_dx_pre == F,]$BMI %>% summary()
 ed_data[ed_data$comb_ed_dx_pre == F,]$BMI %>% sd(na.rm = T)
 ed_data[ed_data$comb_ed_dx_pre == F,]$ethnicity %>% as.factor() %>% summary()
 ed_data[ed_data$comb_ed_dx_pre == F,]$comb_hypertension_dx %>% summary()
+(ed_data[ed_data$comb_ed_dx_pre == F,]$comb_hypertension_age < ed_data[ed_data$comb_ed_dx_pre == F,]$age_start) %>% summary()
 ed_data[ed_data$comb_ed_dx_pre == F,]$comb_diabetes_dx %>% summary()
+(ed_data[ed_data$comb_ed_dx_pre == F,]$comb_diabetes_age < ed_data[ed_data$comb_ed_dx_pre == F,]$age_start) %>% summary()
 ed_data[ed_data$comb_ed_dx_pre == F,]$comb_ihd_dx %>% summary()
+(ed_data[ed_data$comb_ed_dx_pre == F,]$comb_ihd_age < ed_data[ed_data$comb_ed_dx_pre == F,]$age_start) %>% summary()
 ed_data[ed_data$comb_ed_dx_pre == F,]$comb_cvd_dx %>% summary()
+(ed_data[ed_data$comb_ed_dx_pre == F,]$comb_cvd_age < ed_data[ed_data$comb_ed_dx_pre == F,]$age_start) %>% summary()
 ed_data[ed_data$comb_ed_dx_pre == F,]$dead %>% summary()
 ed_data[ed_data$comb_ed_dx_pre == F & ed_data$dead == F,]$age_censoring %>% summary()
 ed_data[ed_data$comb_ed_dx_pre == F & ed_data$dead == F,]$age_censoring %>% sd(na.rm = T)
@@ -915,14 +955,16 @@ td_dat$hypertension <- as.factor(td_dat$hypertension)
 #univariate:
 coxph(
   Surv(time = tstart, time2 = tstop, event = ckd) ~ ed,
-  data = td_dat
+  data = td_dat,
+  control = coxph.control(timefix = FALSE)
 ) %>% summary()
 #multivariate:
 fit1 <- coxph(
   Surv(time = tstart, time2 = tstop, event = ckd) ~ ed + birth_cohort +
     BMI + smoking_status + ethnicity + TDI +
     diabetes + hypertension + ihd + stroke,
-  data = (td_dat)
+  data = (td_dat),
+  control = coxph.control(timefix = FALSE)
 )
 summary(fit1)
 #testing for interaction:
@@ -931,7 +973,8 @@ fit.coxph <- coxph(
   Surv(time = tstart, time2 = tstop, event = ckd) ~ ed*hypertension + birth_cohort +
     BMI + smoking_status + ethnicity + TDI +
     diabetes + ihd + stroke,
-  data = (td_dat)
+  data = (td_dat),
+  control = coxph.control(timefix = FALSE)
 )
 summary(fit.coxph) # the interaction with hypertension is significant therefore we will continue with that interaction in the multivariate model.
 #diabetes mellitus:
@@ -939,7 +982,8 @@ fit.coxph2 <- coxph(
   Surv(time = tstart, time2 = tstop, event = ckd) ~ ed*diabetes + birth_cohort +
     BMI + smoking_status + ethnicity + TDI +
     hypertension + ihd + stroke,
-  data = (td_dat)
+  data = (td_dat),
+  control = coxph.control(timefix = FALSE)
 )
 summary(fit.coxph2) # this interaction is not significant therefore we will leave this out in future analyses.
 
@@ -974,12 +1018,13 @@ td_dat2$event <- factor(temp, 0:2, labels=c("censor", "ckd", "death"))
 remove(temp)
 #I will fit a cause-specific cox proportional hazards model, as I do not think we need to do a Fine-Gray regression model.
 #The reason is that we are not interested in the effect of ED on CKD as a purely aetiological question (see: Putter H, Fiocco M, Geskus RB .. Tutorial in biostatistics: competing risks and multi-state models. Stat Med 2007; 26: 2389–430.)
-cr.fit <- coxph(Surv(tstart, tstop, event) ~ ed, data=td_dat2, id=n_eid)
+cr.fit <- coxph(Surv(tstart, tstop, event) ~ ed, data=td_dat2, id=n_eid, control = coxph.control(timefix = FALSE))
 summary(cr.fit)
 #adjusted:
 cr.fit <- coxph(Surv(tstart, tstop, event) ~ ed*hypertension + birth_cohort +
                   BMI + smoking_status + ethnicity + TDI +
-                  diabetes + ihd + stroke, data=td_dat2, id=n_eid)
+                  diabetes + ihd + stroke, data=td_dat2, id=n_eid,
+                control = coxph.control(timefix = FALSE))
 summary(cr.fit)
 #################################
 # 6. IMPUTATION OF MISSING DATA
@@ -988,12 +1033,13 @@ summary(cr.fit)
 #in the above analyses any rows (= individuals) with missing data for these will have been excluded.
 #to maximise data usage, I will impute these data 10 times using PMM and run all the analyses in the imputed datasets, then pool the results.
 n.imp <- 10
-set.seed(007) #(to get the same results every time the imputations are run)
+set.seed(1412) #(to get the same results every time the imputations are run)
 #select subset of variables that we will use for the imputations:
 temp <- ed_data %>% select(n_eid, age_event, age_start, age_event2, birth_cohort, ethnicity, age_censoring, age_dead, dead, comb_ed_dx_pre,
                            comb_ed_age, comb_ckd_dx, comb_ckd_age, comb_diabetes_dx,
                            comb_diabetes_age, comb_hypertension_dx, comb_hypertension_age,
                            comb_ihd_dx, comb_ihd_age, comb_cvd_dx, comb_cvd_age,
+                           matching_age, matching_hypertension, matching_diabetes, matching_ihd, matching_cvd,
                            smoking_status, BMI, TDI)
 #impute the missing values:
 imp <- aregImpute(~n_eid + age_event + age_start + age_event2 + age_dead + birth_cohort + age_censoring + ethnicity + dead + comb_ed_dx_pre +
@@ -1054,7 +1100,8 @@ for (i in 1:n.imp) {
   #univariate:
   m1 <- coxph(
     Surv(time = tstart, time2 = tstop, event = ckd) ~ ed,
-    data = td_dat[td_dat$.imp == i,]
+    data = td_dat[td_dat$.imp == i,],
+    control = coxph.control(timefix = FALSE)
   )
   #we will save the coefficients and standard errors for ED in these vectors
   COEFS.unadjusted[i] <- m1$coefficients[1]
@@ -1064,14 +1111,15 @@ for (i in 1:n.imp) {
     Surv(time = tstart, time2 = tstop, event = ckd) ~ ed + hypertension + ed:hypertension + birth_cohort +
       BMI + smoking_status + ethnicity + TDI +
       diabetes + ihd + stroke,
-    data = td_dat[td_dat$.imp == i,]
+    data = td_dat[td_dat$.imp == i,],
+    control = coxph.control(timefix = FALSE)
   )
   #same as above:
   COEFS.adjusted[i] <- m2$coefficients[1]
   SE.adjusted[i] <- sqrt(m2$var[1])
   COEFS.interaction[i] <- m2$coefficients[1] + m2$coefficients[15]
   SE.interaction[i] <- sqrt(abs(m2$var[1]) + abs(m2$var[15,15]) + 2 * vcov(m2)[1,15])
-
+  
 }
 # will then write a function to pool the results from each of these imputed datasets
 Pool.rubin.HR <- function(COEFS,SE,n.imp){
@@ -1129,18 +1177,20 @@ remove(temp)
 COEFS.cr.unadjusted <- SE.cr.unadjusted <- rep(NA,n.imp)
 COEFS.cr.adjusted <- SE.cr.adjusted <- COEFS.cr.interaction <- SE.cr.interaction <- rep(NA,n.imp)
 for (i in 1:n.imp) {
-  cr.fit <- coxph(Surv(tstart, tstop, event) ~ ed, data=td_dat2[td_dat2$.imp == i,], id=n_eid)
+  cr.fit <- coxph(Surv(tstart, tstop, event) ~ ed, data=td_dat2[td_dat2$.imp == i,], id=n_eid,
+                  control = coxph.control(timefix = FALSE))
   COEFS.cr.unadjusted[i] <- cr.fit$coefficients[1]
   SE.cr.unadjusted[i] <- sqrt(cr.fit$var[1])
   #adjusted:
   cr.fit2 <- coxph(Surv(tstart, tstop, event) ~ ed + hypertension + ed:hypertension + birth_cohort +
                      BMI + smoking_status + ethnicity + TDI +
-                     diabetes + ihd + stroke, data=td_dat2[td_dat2$.imp == i,], id=n_eid)
+                     diabetes + ihd + stroke, data=td_dat2[td_dat2$.imp == i,], id=n_eid,
+                   control = coxph.control(timefix = FALSE))
   COEFS.cr.adjusted[i] <- cr.fit2$coefficients[1]
   SE.cr.adjusted[i] <- sqrt(cr.fit2$var[1])
   COEFS.cr.interaction[i] <- cr.fit2$coefficients[1] + cr.fit2$coefficients[15]
   SE.cr.interaction[i] <- sqrt(abs(cr.fit2$var[1]) + abs(cr.fit2$var[15,15]) + 2 * vcov(cr.fit2)[1,15])
-
+  
 }
 # pooled HRs (unadjusted; adjusted for people without and with HTN):
 Pool.rubin.HR(COEFS.cr.unadjusted, SE.cr.unadjusted, n.imp)
@@ -1166,16 +1216,16 @@ for (i in 1:n.imp) {
     group_by(n_eid) %>%
     filter(age_start == min(age_start))
   #actual matching:
-  match <- matchit(comb_ed_dx_pre ~ age_start + birth_cohort +
+  match <- matchit(comb_ed_dx_pre ~ matching_age + birth_cohort +
                      BMI + smoking_status + ethnicity + TDI +
-                     comb_diabetes_dx + comb_hypertension_dx +
-                     comb_ihd_dx + comb_cvd_dx,
+                     matching_hypertension + matching_diabetes + matching_diabetes +
+                     matching_ihd + matching_cvd,
                    data=baseline,
                    method="nearest",
                    distance="logit",
                    discard="both",
                    caliper=0.1,
-                   ratio=2
+                   ratio=1
   )
   # extract matrix with matched n_eid
   matrix.match <- cbind(data.frame(baseline[row.names(match$match.matrix),"n_eid"]),
@@ -1198,19 +1248,9 @@ for (i in 1:n.imp) {
 matched <- matched[!is.na(matched$n_eid),]
 #the dataset matched is now a dataframe with PSM cases from each of the imputed datasets.
 # for table comparing ED with non ED (matched) I will use create table one as this includes SMD (SMD <0.1 indicates balance of covariates)
-vars <- c("age_start", "birth_cohort", "smoking_status", "TDI", "BMI", "ethnicity", "comb_hypertension_dx", "comb_diabetes_dx", "comb_ihd_dx", "comb_cvd_dx")
+vars <- c("matching_age", "birth_cohort", "smoking_status", "TDI", "BMI", "ethnicity", "matching_hypertension", "matching_diabetes", "matching_ihd", "matching_cvd")
 CreateTableOne(vars = vars, strata = "comb_ed_dx_pre", data = matched, test = F) %>% print(smd = T)
 
-# raw data - person years and CKD events in ED and non ED
-aggregate(matched$person_years_ed_ckd~matched$comb_ed_dx_pre, FUN=sum)
-aggregate(matched$person_years_noned_ckd~matched$comb_ed_dx_pre, FUN=sum)
-(matched[matched$comb_ed_dx_pre == T,]$comb_ckd_dx == T) %>% summary()
-(matched[matched$comb_ed_dx_pre == F,]$comb_ckd_dx == T) %>% summary()
-# raw data - person years and deaths in ED and non ED
-aggregate(matched$person_years_ed_death~matched$comb_ed_dx_pre, FUN=sum)
-aggregate(matched$person_years_noned_death~matched$comb_ed_dx_pre, FUN=sum)
-(matched[matched$comb_ed_dx_pre == T,]$dead == T) %>% summary()
-(matched[matched$comb_ed_dx_pre == F,]$dead == T) %>% summary()
 
 
 # Now we will also run the survival analyses in these propensity score matched patients
@@ -1224,31 +1264,35 @@ td_dat2_matched <- td_dat2[td_dat2$n_eid.imp %in% matched$n_eid.imp,]
 #run the survival analyses in each of the imputed + matched datasets
 for (i in 1:n.imp) {
   psm <- coxph(Surv(tstart, tstop, ckd) ~ ed,
-               data = td_dat_matched[td_dat_matched$.imp == i,])
+               data = td_dat_matched[td_dat_matched$.imp == i,],
+               control = coxph.control(timefix = FALSE))
   psm2 <- coxph(Surv(tstart, tstop, ckd) ~ ed + hypertension + ed:hypertension + birth_cohort + BMI + ethnicity +
                   smoking_status + TDI + diabetes + ihd + stroke,
-                data = td_dat_matched[td_dat_matched$.imp == i,])
+                data = td_dat_matched[td_dat_matched$.imp == i,],
+                control = coxph.control(timefix = FALSE))
   COEFS.unadj.psm[i] <- psm$coefficients[1]
   SE.unadj.psm[i] <- sqrt(psm$var[1])
   COEFS.adj.psm[i] <- psm2$coefficients[1]
   SE.adj.psm[i] <- sqrt(psm2$var[1])
   COEFS.interaction.psm[i] <- psm2$coefficients[1] + psm2$coefficients[15]
   SE.interaction.psm[i] <- sqrt(abs(psm2$var[1]) + abs(psm2$var[15,15]) + 2 * vcov(psm2)[1,15])
-
+  
   
   #run a cause-specific cox PH as well for competing risk of death:
-  cr.fit.matched <- coxph(Surv(tstart, tstop, event) ~ ed, data=td_dat2_matched[td_dat2_matched$.imp == i,], id=n_eid)
+  cr.fit.matched <- coxph(Surv(tstart, tstop, event) ~ ed, data=td_dat2_matched[td_dat2_matched$.imp == i,], id=n_eid,
+                          control = coxph.control(timefix = FALSE))
   COEFS.cr.unadj.psm[i] <- cr.fit.matched$coefficients[1]
   SE.cr.unadj.psm[i] <- sqrt(cr.fit.matched$var[1])
   #adjusted:
   cr.fit.matched2 <- coxph(Surv(tstart, tstop, event) ~ ed + hypertension + ed:hypertension + birth_cohort +
                              BMI + smoking_status + ethnicity + TDI +
-                             diabetes + ihd + stroke, data=td_dat2_matched[td_dat2_matched$.imp == i,], id=n_eid)
+                             diabetes + ihd + stroke, data=td_dat2_matched[td_dat2_matched$.imp == i,], id=n_eid,
+                           control = coxph.control(timefix = FALSE))
   COEFS.cr.adj.psm[i] <- cr.fit.matched2$coefficients[1]
   SE.cr.adj.psm[i] <- sqrt(cr.fit.matched2$var[1])
   COEFS.cr.interaction.psm[i] <- cr.fit.matched2$coefficients[1] + cr.fit.matched2$coefficients[15]
   SE.cr.interaction.psm[i] <- sqrt(abs(cr.fit.matched2$var[1]) + abs(cr.fit.matched2$var[15,15]) + 2 * vcov(cr.fit.matched2)[1,15])
-
+  
 }
 # pool results:
 #unadjusted HR
@@ -1297,8 +1341,8 @@ for (i in 1:length(dummy_list)) {
   plot(csurv, xlim = c(dummy_list[[i]][1,1],dummy_list[[i]][1,1]+10), xscale = 1, ylim = c(0.9, 1),
        xlab = "Age", ylab = "CKD-free survival",
        col = c("firebrick1", "firebrick1", "dodgerblue", "dodgerblue", "chartreuse3", "chartreuse3"), lty = c(2:1), lwd = 2)
-#  legend(dummy_list[[i]][1,1], 0.95, c("ED + HTN", "HTN", "ED + DM", "DM", "ED", "None"),
-#         cex = 0.7, col = c("firebrick1", "firebrick1", "dodgerblue", "dodgerblue", "chartreuse3", "chartreuse3"), lty = 2:1, bty = 'n', lwd = 2)
+  #  legend(dummy_list[[i]][1,1], 0.95, c("ED + HTN", "HTN", "ED + DM", "DM", "ED", "None"),
+  #         cex = 0.7, col = c("firebrick1", "firebrick1", "dodgerblue", "dodgerblue", "chartreuse3", "chartreuse3"), lty = 2:1, bty = 'n', lwd = 2)
   title(paste("Age", dummy_list[[i]][1,1]))
 }
 
@@ -1310,7 +1354,7 @@ for (i in 1:length(dummy_list)) {
   plot(csurv2[,'ckd'], xlim = c(dummy_list[[i]][1,1],dummy_list[[i]][1,1]+10), xscale=1, ylim = c(0, 0.07),
        xlab="Age", ylab="Cumulative CKD incidence", 
        col = c("firebrick1", "firebrick1", "dodgerblue", "dodgerblue", "chartreuse3", "chartreuse3"), lty = c(2:1), lwd = 2)
-#  legend(dummy_list[[i]][1,1], 0.95, c("ED + HTN", "HTN", "ED + DM", "DM", "ED", "None"),
-#         cex = 0.7, col = c("firebrick1", "firebrick1", "dodgerblue", "dodgerblue", "chartreuse3", "chartreuse3"), lty = 2:1, bty = 'n', lwd = 2)
+  #  legend(dummy_list[[i]][1,1], 0.95, c("ED + HTN", "HTN", "ED + DM", "DM", "ED", "None"),
+  #         cex = 0.7, col = c("firebrick1", "firebrick1", "dodgerblue", "dodgerblue", "chartreuse3", "chartreuse3"), lty = 2:1, bty = 'n', lwd = 2)
   title(paste("Age", dummy_list[[i]][1,1]))
 }
