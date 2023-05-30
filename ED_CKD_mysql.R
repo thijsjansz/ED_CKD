@@ -20,7 +20,6 @@ file_list <- c("ed_readcodes.txt",
                "diabetes_readcodes.txt",
                "cvd_readcodes.txt",
                "hypertension_readcodes.txt",
-               "chol_readcodes.txt",
                "ihd_readcodes.txt")
 
 for (file in file_list) {
